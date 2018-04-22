@@ -10,18 +10,18 @@ import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
-public class Main extends Application {
+public class Main extends Application
+{
 
-	
 	private void primaryStage_Hiding(WindowEvent e, FXMLLoader fxmlLoader)
 	{
-		((WebSocketChatStageController) fxmlLoader.getController()).closeSession(new CloseReason(CloseCodes.NORMAL_CLOSURE,"Stage is hiding"));
+		((WebSocketChatStageController) fxmlLoader.getController()).closeSession(new CloseReason(CloseCodes.NORMAL_CLOSURE, "Stage is hiding"));
 	}
-	
+
 	@Override
 	public void start(Stage primaryStage) throws Exception
 	{
-		try 
+		try
 		{
 			FXMLLoader fxmlLoader = new FXMLLoader(Main.class.getResource("/MessageWindow.fxml"));
 			AnchorPane root = fxmlLoader.load();
@@ -29,36 +29,19 @@ public class Main extends Application {
 			primaryStage.setScene(scene);
 			primaryStage.setTitle("JavaFX Web Socket Client");
 			primaryStage.setResizable(false);
-			primaryStage.setOnHiding( e -> primaryStage_Hiding(e, fxmlLoader));
+			primaryStage.setOnHiding(e -> primaryStage_Hiding(e, fxmlLoader));
 			primaryStage.show();
-		} catch(Exception e)
+		}
+		catch (Exception e)
 		{
 			e.printStackTrace();
 		}
-		
+
 	}
-	
+
 	public static void main(String[] args)
 	{
 		launch(args);
 	}
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
