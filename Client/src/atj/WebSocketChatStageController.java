@@ -116,8 +116,9 @@ public class WebSocketChatStageController
 			alert.setTitle("Wrong Username");
 			alert.setHeaderText(null);
 			alert.setContentText("Username can not be empty!");
-	
 			alert.showAndWait();
+			
+			userTextField.setText(user);
 			return;
 		}
 		
