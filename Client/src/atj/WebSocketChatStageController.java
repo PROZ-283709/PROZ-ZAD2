@@ -1,7 +1,9 @@
 package atj;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 
@@ -46,6 +48,8 @@ public class WebSocketChatStageController
 	private WebSocketClient webSocketClient;
 	private FileHandler fileHandler;
 
+	private static final int MB2 = 1024*1024*2;
+	
 	@FXML
 	private void initialize()
 	{
@@ -85,11 +89,8 @@ public class WebSocketChatStageController
 	{
 		File file = fileHandler.chooseFile();
 
-		if (file != null)
-		{
-			webSocketClient.sendMessage(file.getName(), true);
-			webSocketClient.sendFile(file);
-		}
+		if (file != null)  webSocketClient.sendFile(file);
+		
 	}
 
 	@FXML
@@ -104,7 +105,7 @@ public class WebSocketChatStageController
 	{
 		if (!messageTextField.getText().trim().isEmpty())
 		{
-			webSocketClient.sendMessage(messageTextField.getText(), false);
+			webSocketClient.sendMessage(messageTextField.getText());
 			messageTextField.clear();
 		}
 	}
@@ -125,7 +126,7 @@ public class WebSocketChatStageController
 
 		if (user.equals(userTextField.getText()))  return;
 
-		webSocketClient.sendMessage(" CHANGED HIS NICKNAME TO: " + userTextField.getText(), false);
+		webSocketClient.sendMessage(" CHANGED HIS NICKNAME TO: " + userTextField.getText());
 		user = userTextField.getText();
 	}
 
@@ -175,15 +176,19 @@ public class WebSocketChatStageController
 		public void onMessage(final String message, Session session)
 		{
 			System.out.println("Message was received");
-
-			if (message.charAt(message.length() - 1) == '0')
-			{
-				chatTextArea.setText(chatTextArea.getText() + message.substring(0, message.length() - 1) + "\n");
-			} 
-			else 
+			
+			if(message.charAt(message.length() - 1) == '1')
 			{
 				Platform.runLater(() -> attachmentsListView.getItems().add(message.substring(0, message.length() - 1)));
 			}
+			else
+			{
+				chatTextArea.setText(chatTextArea.getText() + message.substring(0, message.length() - 1) + "\n");
+				
+				if(message.charAt(message.length() - 1) == '2') fileHandler.stopReceiving();
+			}
+			
+			
 		}
 
 		@OnMessage
@@ -207,20 +212,12 @@ public class WebSocketChatStageController
 			}
 		}
 
-		public void sendMessage(String message, boolean isFile)
+		public void sendMessage(String message)
 		{
 			try 
 			{
-				if (isFile == false)
-				{
-					System.out.println("Message was sent: " + message);
-					session.getBasicRemote().sendText(user + ": " + message + "0");
-				}
-				else
-				{
-					session.getBasicRemote().sendText(user + ": Sent a file: " + message + "0");
-					session.getBasicRemote().sendText(user + ": " + message + "1");
-				}
+				System.out.println("Message was sent: " + message);
+				session.getBasicRemote().sendText(user + ": " + message + "0");
 			}
 			catch (IOException ex) 
 			{
@@ -230,15 +227,52 @@ public class WebSocketChatStageController
 
 		public void sendFile(File file)
 		{
+			boolean isEqual = false;
+			int parts = (int)(file.length() / MB2);
+			byte[] buffer;
+			
+			if( (file.length() % MB2) == 0 ) isEqual = true;
+			
 			try
 			{
-				ByteBuffer buf = fileHandler.converFileToByteBuffer(file);
-				session.getBasicRemote().sendBinary(buf);
+				ByteBuffer buf = ByteBuffer.allocateDirect(MB2);
+				InputStream is = new FileInputStream(file);
+				buffer = new byte[MB2];
+				
+				for(int i = 0; i < parts ; ++i )
+				{
+					is.read(buffer);
+					buf.put(buffer);
+					
+					buf.flip();
+					session.getBasicRemote().sendBinary(buf);
+					buf.clear();
+				}
+				
+				if(!isEqual)
+				{
+					buffer = new byte[(int) (file.length() - MB2*parts) ];
+					buf = ByteBuffer.allocateDirect((int) (file.length() - MB2*parts));
+					
+					is.read(buffer);
+					buf.put(buffer);
+					
+					buf.flip();
+					session.getBasicRemote().sendBinary(buf);
+					buf.clear();
+				}
+				
+				is.close();
+				
+				session.getBasicRemote().sendText(user + ": Sent a file: " + file.getName() + "2");
+				session.getBasicRemote().sendText(user + ": " + file.getName() + "1");
 			}
 			catch (IOException ex)
 			{
 				ex.printStackTrace();
 			}
+		
+			
 		}
 	}// publicclasWebSocketClient
 }// public classWebSocketChatStageControler
