@@ -89,8 +89,18 @@ public class WebSocketChatStageController
 	{
 		File file = fileHandler.chooseFile();
 
-		if (file != null)  webSocketClient.sendFile(file);
-		
+		if (file != null)
+		{
+			Thread thread = new Thread()
+			{
+			    public void run()
+			    {
+			    	webSocketClient.sendFile(file);
+			    }
+			};
+			
+			thread.start();
+		}
 	}
 
 	@FXML
@@ -227,33 +237,34 @@ public class WebSocketChatStageController
 
 		public void sendFile(File file)
 		{
-			boolean isEqual = false;
-			int parts = (int)(file.length() / MB2);
-			byte[] buffer;
-			
-			if( (file.length() % MB2) == 0 ) isEqual = true;
 			
 			try
 			{
+		    	boolean isEqual = false;
+				int parts = (int)(file.length() / MB2);
+				byte[] buffer;						
+						
+				if( (file.length() % MB2) == 0 ) isEqual = true;
+						
 				ByteBuffer buf = ByteBuffer.allocateDirect(MB2);
 				InputStream is = new FileInputStream(file);
 				buffer = new byte[MB2];
-				
+						
 				for(int i = 0; i < parts ; ++i )
-				{
+				{							
 					is.read(buffer);
 					buf.put(buffer);
-					
+				
 					buf.flip();
 					session.getBasicRemote().sendBinary(buf);
 					buf.clear();
 				}
-				
+						
 				if(!isEqual)
 				{
 					buffer = new byte[(int) (file.length() - MB2*parts) ];
 					buf = ByteBuffer.allocateDirect((int) (file.length() - MB2*parts));
-					
+							
 					is.read(buffer);
 					buf.put(buffer);
 					
@@ -261,9 +272,9 @@ public class WebSocketChatStageController
 					session.getBasicRemote().sendBinary(buf);
 					buf.clear();
 				}
-				
+						
 				is.close();
-				
+						
 				session.getBasicRemote().sendText(user + ": Sent a file: " + file.getName() + "2");
 				session.getBasicRemote().sendText(user + ": " + file.getName() + "1");
 			}
@@ -271,8 +282,6 @@ public class WebSocketChatStageController
 			{
 				ex.printStackTrace();
 			}
-		
-			
 		}
 	}// publicclasWebSocketClient
 }// public classWebSocketChatStageControler
