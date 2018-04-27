@@ -12,9 +12,7 @@ import javafx.stage.FileChooser;
 
 public class FileHandler
 {
-	boolean isReceiving = false;
-	
-	private ArrayList<File> attachedFiles = new ArrayList<File>();
+	private ArrayList<Attachment> attachedFiles = new ArrayList<Attachment>();
 
 	public File chooseFile()
 	{
@@ -25,35 +23,22 @@ public class FileHandler
 		return file;
 	}
 
-	public void addFile(ByteBuffer buf)
+	public void addFile(ByteBuffer buf, String sessionID)
 	{
-		try 
+		int index = getWritableIndex(sessionID);
+		
+		if( index != -1 )
 		{
-			if(!isReceiving)
-			{
-				attachedFiles.add(File.createTempFile("temp", ".tmp"));
-				isReceiving = true;
-			}
-			
-			FileOutputStream fos;
-			FileChannel channel;
-				
-			fos = new FileOutputStream( attachedFiles.get( attachedFiles.size() - 1 ) , true) ;
-			channel = fos.getChannel();
-			channel.write(buf);
-			channel.close();
-			fos.close();
-			
+			attachedFiles.get(index).add(buf);
+			return;
 		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-		}
+		
+		attachedFiles.add(new Attachment(sessionID, buf));
+		
 	}
 
 	public void downloadFile(int index)
 	{
-		
 		FileChooser fileChooser = new FileChooser();
 		fileChooser.setTitle("Choose where you want to save this file");
 		File file = fileChooser.showSaveDialog(null);
@@ -66,7 +51,7 @@ public class FileHandler
 			FileChannel dest;
 			try 
 			{
-				fis = new FileInputStream(attachedFiles.get(index));
+				fis = new FileInputStream(attachedFiles.get(index).getFile());
 				fos = new FileOutputStream(file);
 				
 				src = fis.getChannel();
@@ -85,9 +70,21 @@ public class FileHandler
 			}
 		}
 	}
-	
-	public void stopReceiving()
+
+	public void stopReceiving(String sessionID)
 	{
-		isReceiving = false;
+		
+			attachedFiles.get( getWritableIndex(sessionID) ).stopReceving();
+		
+	}
+	
+	public int getWritableIndex(String sessionID)
+	{
+		for(int i = 0 ; i < attachedFiles.size() ; ++i)
+		{
+			if( attachedFiles.get(i).checkWritable(sessionID) ) return i;
+		}
+		
+		return -1;
 	}
 }

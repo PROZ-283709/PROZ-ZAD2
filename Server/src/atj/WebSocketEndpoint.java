@@ -58,8 +58,10 @@ public class WebSocketEndpoint
 		{
 			for (Session oneSession : session.getOpenSessions())
 			{
-				if (oneSession.isOpen())  oneSession.getBasicRemote().sendBinary(buf);
-				
+				if (oneSession.isOpen() && !oneSession.getId().equals(session.getId()))
+				{
+				  oneSession.getBasicRemote().sendBinary(buf);
+				}
 			}
 		}
 		catch (IOException e)

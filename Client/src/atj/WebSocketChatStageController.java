@@ -108,7 +108,18 @@ public class WebSocketChatStageController
 	{
 		int index = attachmentsListView.getSelectionModel().getSelectedIndex();
 
-		if (index != -1)  fileHandler.downloadFile(index);
+		if( (index != -1 ) && !( attachmentsListView.getItems().get(index).equals("")) )
+		{
+			Thread thread = new Thread()
+			{
+			    public void run()
+			    {
+			    	Platform.runLater( () -> fileHandler.downloadFile(index) );
+			    }
+			};
+			
+			thread.start();
+		}
 	}
 
 	private void sendMessage()
@@ -187,25 +198,29 @@ public class WebSocketChatStageController
 		{
 			System.out.println("Message was received");
 			
-			if(message.charAt(message.length() - 1) == '1')
+			if(message.charAt(message.length() - 1) == '0')
 			{
-				Platform.runLater(() -> attachmentsListView.getItems().add(message.substring(0, message.length() - 1)));
+				chatTextArea.setText(chatTextArea.getText() + message.substring(0, message.length() - 1) + "\n");
+			}
+			else if(message.charAt(message.length() - 1) == '2')
+			{
+				Platform.runLater(() -> attachmentsListView.getItems().add(""));
 			}
 			else
 			{
-				chatTextArea.setText(chatTextArea.getText() + message.substring(0, message.length() - 1) + "\n");
+				int index = fileHandler.getWritableIndex(session.getId());
+				fileHandler.stopReceiving(session.getId());
 				
-				if(message.charAt(message.length() - 1) == '2') fileHandler.stopReceiving();
+				Platform.runLater(() -> attachmentsListView.getItems().set(index, message.substring(0, message.length() - 1)));
 			}
-			
-			
 		}
 
 		@OnMessage
 		public void onMessage(ByteBuffer buf, Session session)
 		{
 			System.out.println("File was received");
-			fileHandler.addFile(buf);
+			fileHandler.addFile(buf, session.getId());
+			
 		}
 
 		private void connectToWebSocket()
@@ -237,7 +252,6 @@ public class WebSocketChatStageController
 
 		public void sendFile(File file)
 		{
-			
 			try
 			{
 		    	boolean isEqual = false;
@@ -249,7 +263,8 @@ public class WebSocketChatStageController
 				ByteBuffer buf = ByteBuffer.allocateDirect(MB2);
 				InputStream is = new FileInputStream(file);
 				buffer = new byte[MB2];
-						
+				
+				session.getBasicRemote().sendText("2");
 				for(int i = 0; i < parts ; ++i )
 				{							
 					is.read(buffer);
@@ -275,7 +290,7 @@ public class WebSocketChatStageController
 						
 				is.close();
 						
-				session.getBasicRemote().sendText(user + ": Sent a file: " + file.getName() + "2");
+				session.getBasicRemote().sendText(user + ": Sent a file: " + file.getName() + "0");
 				session.getBasicRemote().sendText(user + ": " + file.getName() + "1");
 			}
 			catch (IOException ex)
