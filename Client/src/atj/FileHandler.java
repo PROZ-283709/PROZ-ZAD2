@@ -11,8 +11,9 @@ import java.util.ArrayList;
 import javafx.stage.FileChooser;
 
 public class FileHandler
-{
-	private ArrayList<Attachment> attachedFiles = new ArrayList<Attachment>();
+{	
+	boolean isReceiving = false;		
+	private ArrayList<File> attachedFiles = new ArrayList<File>();
 
 	public File chooseFile()
 	{
@@ -22,69 +23,68 @@ public class FileHandler
 
 		return file;
 	}
-
-	public void addFile(ByteBuffer buf, String sessionID)
+	
+	public void addFile(File file)
 	{
-		int index = getWritableIndex(sessionID);
-		
-		if( index != -1 )
-		{
-			attachedFiles.get(index).add(buf);
-			return;
-		}
-		
-		attachedFiles.add(new Attachment(sessionID, buf));
-		
-	}
-
-	public void downloadFile(int index)
-	{
-		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Choose where you want to save this file");
-		File file = fileChooser.showSaveDialog(null);
-
-		if (file != null)
-		{
-			FileOutputStream fos;
-			FileInputStream fis;
-			FileChannel src;
-			FileChannel dest;
-			try 
-			{
-				fis = new FileInputStream(attachedFiles.get(index).getFile());
-				fos = new FileOutputStream(file);
-				
-				src = fis.getChannel();
-				dest = fos.getChannel();
-				
-				dest.transferFrom(src, 0, src.size());
-				
-				fis.close();
-				fos.close();
-				src.close();
-				dest.close();
-			} 
-			catch (IOException e)
-			{
-				e.printStackTrace();
-			}
-		}
-	}
-
-	public void stopReceiving(String sessionID)
-	{
-		
-			attachedFiles.get( getWritableIndex(sessionID) ).stopReceving();
-		
+		attachedFiles.add(file);
 	}
 	
-	public int getWritableIndex(String sessionID)
+	public void addFile(ByteBuffer buf)
 	{
-		for(int i = 0 ; i < attachedFiles.size() ; ++i)
+		try 
 		{
-			if( attachedFiles.get(i).checkWritable(sessionID) ) return i;
+			if(!isReceiving)
+			{
+				attachedFiles.add(File.createTempFile("temp", ".tmp"));
+				isReceiving = true;
+			}
+			
+			FileOutputStream fos;
+			FileChannel channel;
+						
+			fos = new FileOutputStream( attachedFiles.get( attachedFiles.size() - 1 ) , true) ;
+			channel = fos.getChannel();
+			channel.write(buf);
+			channel.close();
+			fos.close();
+					
 		}
+		catch (IOException e)	
+		{
+			e.printStackTrace();
+		}
+	}
+
+	public void downloadFile(int index, File file)
+	{
+		FileOutputStream fos;
+		FileInputStream fis;
+		FileChannel src;
+		FileChannel dest;
 		
-		return -1;
+		try 
+		{
+			fis = new FileInputStream(attachedFiles.get(index));
+			fos = new FileOutputStream(file);
+				
+			src = fis.getChannel();
+			dest = fos.getChannel();
+				
+			dest.transferFrom(src, 0, src.size());
+				
+			fis.close();
+			fos.close();
+			src.close();
+			dest.close();
+		} 
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+
+	public void stopReceiving()
+	{
+			isReceiving = false;
 	}
 }

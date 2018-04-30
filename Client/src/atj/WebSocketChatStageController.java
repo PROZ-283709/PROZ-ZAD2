@@ -19,6 +19,7 @@ import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
@@ -28,6 +29,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.stage.FileChooser;
 
 public class WebSocketChatStageController
 {
@@ -88,17 +90,21 @@ public class WebSocketChatStageController
 	private void btnAdd_Click()
 	{
 		File file = fileHandler.chooseFile();
-
-		if (file != null)
+		
+		if(file != null)
 		{
-			Thread thread = new Thread()
+			Task<Void> task = new Task<Void>()
 			{
-			    public void run()
-			    {
-			    	webSocketClient.sendFile(file);
-			    }
+				@Override
+				protected Void call() throws Exception
+				{
+					webSocketClient.sendFile(file);
+					return null;
+				}
 			};
-			
+
+			Thread thread = new Thread(task);
+			thread.setDaemon(true);
 			thread.start();
 		}
 	}
@@ -108,17 +114,28 @@ public class WebSocketChatStageController
 	{
 		int index = attachmentsListView.getSelectionModel().getSelectedIndex();
 
-		if( (index != -1 ) && !( attachmentsListView.getItems().get(index).equals("")) )
+		if(index != -1 ) 
 		{
-			Thread thread = new Thread()
-			{
-			    public void run()
-			    {
-			    	Platform.runLater( () -> fileHandler.downloadFile(index) );
-			    }
-			};
+			FileChooser fileChooser = new FileChooser();
+			fileChooser.setTitle("Choose where you want to save this file");
+			File file = fileChooser.showSaveDialog(null);
 			
-			thread.start();
+			if(file != null)
+			{
+				Task<Void> task = new Task<Void>()
+				{
+					@Override
+					protected Void call() throws Exception
+					{
+						fileHandler.downloadFile(index, file);
+						return null;
+					}
+				};
+
+				Thread thread = new Thread(task);
+				thread.setDaemon(true);
+				thread.start();
+			}
 		}
 	}
 
@@ -198,29 +215,25 @@ public class WebSocketChatStageController
 		{
 			System.out.println("Message was received");
 			
-			if(message.charAt(message.length() - 1) == '0')
+			if(message.charAt(message.length() - 1) == '1')
 			{
-				chatTextArea.setText(chatTextArea.getText() + message.substring(0, message.length() - 1) + "\n");
-			}
-			else if(message.charAt(message.length() - 1) == '2')
-			{
-				Platform.runLater(() -> attachmentsListView.getItems().add(""));
+				Platform.runLater(() -> attachmentsListView.getItems().add(message.substring(0, message.length() - 1)));
 			}
 			else
 			{
-				int index = fileHandler.getWritableIndex(session.getId());
-				fileHandler.stopReceiving(session.getId());
-				
-				Platform.runLater(() -> attachmentsListView.getItems().set(index, message.substring(0, message.length() - 1)));
+				chatTextArea.setText(chatTextArea.getText() + message.substring(0, message.length() - 1) + "\n");
+
+				if(message.charAt(message.length() - 1) == '2') fileHandler.stopReceiving();
 			}
+		
 		}
 
 		@OnMessage
 		public void onMessage(ByteBuffer buf, Session session)
 		{
 			System.out.println("File was received");
-			fileHandler.addFile(buf, session.getId());
 			
+			fileHandler.addFile(buf);
 		}
 
 		private void connectToWebSocket()
@@ -243,6 +256,7 @@ public class WebSocketChatStageController
 			{
 				System.out.println("Message was sent: " + message);
 				session.getBasicRemote().sendText(user + ": " + message + "0");
+				chatTextArea.setText(chatTextArea.getText() + user + ": " + message + "\n");
 			}
 			catch (IOException ex) 
 			{
@@ -254,32 +268,18 @@ public class WebSocketChatStageController
 		{
 			try
 			{
-		    	boolean isEqual = false;
+				boolean isEqual = false;
 				int parts = (int)(file.length() / MB2);
 				byte[] buffer;						
-						
+							
 				if( (file.length() % MB2) == 0 ) isEqual = true;
 						
 				ByteBuffer buf = ByteBuffer.allocateDirect(MB2);
 				InputStream is = new FileInputStream(file);
 				buffer = new byte[MB2];
-				
-				session.getBasicRemote().sendText("2");
+					
 				for(int i = 0; i < parts ; ++i )
 				{							
-					is.read(buffer);
-					buf.put(buffer);
-				
-					buf.flip();
-					session.getBasicRemote().sendBinary(buf);
-					buf.clear();
-				}
-						
-				if(!isEqual)
-				{
-					buffer = new byte[(int) (file.length() - MB2*parts) ];
-					buf = ByteBuffer.allocateDirect((int) (file.length() - MB2*parts));
-							
 					is.read(buffer);
 					buf.put(buffer);
 					
@@ -287,10 +287,23 @@ public class WebSocketChatStageController
 					session.getBasicRemote().sendBinary(buf);
 					buf.clear();
 				}
+							
+				if(!isEqual)
+				{
+					buffer = new byte[(int) (file.length() - MB2*parts) ];
+					buf = ByteBuffer.allocateDirect((int) (file.length() - MB2*parts));
+								
+					is.read(buffer);
+					buf.put(buffer);
 						
+					buf.flip();
+					session.getBasicRemote().sendBinary(buf);
+					buf.clear();
+				}
+							
 				is.close();
-						
-				session.getBasicRemote().sendText(user + ": Sent a file: " + file.getName() + "0");
+							
+				session.getBasicRemote().sendText(user + ": Sent a file: " + file.getName() + "2");
 				session.getBasicRemote().sendText(user + ": " + file.getName() + "1");
 			}
 			catch (IOException ex)
