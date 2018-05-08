@@ -35,7 +35,9 @@ public class FileHandler
 		{
 			if(!isReceiving)
 			{
-				attachedFiles.add(File.createTempFile("temp", ".tmp"));
+				File tempFile = File.createTempFile("temp", ".tmp");
+				tempFile.deleteOnExit();
+				attachedFiles.add(tempFile);
 				isReceiving = true;
 			}
 			
